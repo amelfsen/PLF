@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PLF Validierungs-Simulator</title>
+    <!-- Tailwind CSS für modernes, responsives Design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js für die ROC Kurve -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        hawblue: '#003366',
+                        plfgreen: '#4CAF50',
+                        plfred: '#F44336',
+                        arrowpurple: '#9C27B0'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Verhindert Pfeile in Number-Inputs für ein saubereres Layout */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-8">
+        
+        <!-- HEADER -->
+        <header class="bg-hawblue text-white p-6 rounded-xl shadow-lg flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold">Interaktiver PLF-Simulator</h1>
+                <p class="text-blue-200 mt-2">Bewertung von Klassifikatoren & Diagnosetests</p>
+            </div>
+            <div class="text-right hidden md:block">
+                <p class="text-sm italic">HAW Kiel</p>
+                <p class="text-sm font-semibold">FB Agrarwirtschaft</p>
+            </div>
+        </header>
+
+        <!-- MAIN GRID: CONTROLS & MATRIX -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- PARAMETER CONTROLS -->
+            <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+                <h2 class="text-xl font-bold text-hawblue mb-6 border-b pb-2">1. Parameter einstellen</h2>
+                
+                <div class="space-y-6">
+                    <!-- Gesamtanzahl -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="font-semibold text-slate-700 flex items-center gap-2">
+                                Anzahl Tiere gesamt:
+                                <input type="number" id="num_total" min="10" max="1000" value="100" class="w-24 text-center border-2 border-slate-300 rounded-md py-0.5 focus:border-hawblue focus:outline-none text-hawblue font-bold">
+                            </label>
+                        </div>
+                        <input type="range" id="slide_total" min="10" max="1000" step="10" value="100" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-hawblue">
+                    </div>
+
+                    <!-- Prävalenz -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="font-semibold text-slate-700 flex items-center gap-2">
+                                Krankheits-Prävalenz (%):
+                                <input type="number" id="num_prev" min="0" max="100" step="0.1" value="5" class="w-20 text-center border-2 border-slate-300 rounded-md py-0.5 focus:border-hawblue focus:outline-none text-hawblue font-bold">
+                            </label>
+                            <span class="text-sm text-slate-500">Kranke Tiere: <span id="num_sick" class="font-bold text-hawblue">50</span></span>
+                        </div>
+                        <input type="range" id="slide_prev" min="0" max="100" step="1" value="5" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-hawblue">
+                    </div>
+
+                    <hr>
+
+                    <!-- Sensitivität -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="font-semibold text-slate-700 flex items-center gap-2">
+                                Sensitivität / Recall (%):
+                                <input type="number" id="num_sens" min="0" max="100" step="0.1" value="80" class="w-20 text-center border-2 border-slate-300 rounded-md py-0.5 focus:border-blue-500 focus:outline-none text-blue-600 font-bold">
+                            </label>
+                        </div>
+                        <input type="range" id="slide_sens" min="0" max="100" step="1" value="80" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                        <p class="text-xs text-slate-500 mt-1">Wie viel % der kranken Tiere findet der Sensor?</p>
+                    </div>
+
+                    <!-- Spezifität -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="font-semibold text-slate-700 flex items-center gap-2">
+                                Spezifität (%):
+                                <input type="number" id="num_spec" min="0" max="100" step="0.1" value="90" class="w-20 text-center border-2 border-slate-300 rounded-md py-0.5 focus:border-blue-500 focus:outline-none text-blue-600 font-bold">
+                            </label>
+                        </div>
+                        <input type="range" id="slide_spec" min="0" max="100" step="1" value="90" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                        <p class="text-xs text-slate-500 mt-1">Wie viel % der gesunden Tiere werden korrekt in Ruhe gelassen?</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONFUSION MATRIX -->
+            <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 flex flex-col">
+                <h2 class="text-xl font-bold text-hawblue mb-2 border-b pb-2">2. Konfusionsmatrix (Absolute Zahlen)</h2>
+                <p class="text-sm text-slate-500 mb-6">Sie können die Zahlen in den Feldern auch direkt überschreiben.</p>
+                
+                <div class="flex-grow flex items-center justify-center">
+                    <table class="w-full text-center border-collapse">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th class="pb-4 text-hawblue font-bold">ALARM (+)<br><span class="text-sm font-normal text-slate-500">Sensor meldet krank</span></th>
+                                <th class="pb-4 text-hawblue font-bold">KEIN ALARM (-)<br><span class="text-sm font-normal text-slate-500">Sensor bleibt still</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th class="pr-4 text-hawblue font-bold text-right align-middle w-32">Tier ist KRANK<br><span class="text-sm font-normal text-slate-500">(Wahrheit +)</span></th>
+                                <td class="p-2">
+                                    <div class="bg-green-100 border-2 border-green-500 rounded-lg p-3">
+                                        <div class="font-bold text-green-700 mb-1">TP (Richtig Positiv)</div>
+                                        <input type="number" id="inp_tp" class="w-full text-center text-2xl font-bold bg-white border rounded p-1 text-green-800" value="40">
+                                    </div>
+                                </td>
+                                <td class="p-2">
+                                    <div class="bg-red-100 border-2 border-red-500 rounded-lg p-3">
+                                        <div class="font-bold text-red-700 mb-1">FN (Falsch Negativ)</div>
+                                        <input type="number" id="inp_fn" class="w-full text-center text-2xl font-bold bg-white border rounded p-1 text-red-800" value="10">
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="pr-4 text-hawblue font-bold text-right align-middle">Tier ist GESUND<br><span class="text-sm font-normal text-slate-500">(Wahrheit -)</span></th>
+                                <td class="p-2">
+                                    <div class="bg-red-100 border-2 border-red-500 rounded-lg p-3">
+                                        <div class="font-bold text-red-700 mb-1">FP (Falsch Positiv)</div>
+                                        <input type="number" id="inp_fp" class="w-full text-center text-2xl font-bold bg-white border rounded p-1 text-red-800" value="95">
+                                    </div>
+                                </td>
+                                <td class="p-2">
+                                    <div class="bg-green-100 border-2 border-green-500 rounded-lg p-3">
+                                        <div class="font-bold text-green-700 mb-1">TN (Richtig Negativ)</div>
+                                        <input type="number" id="inp_tn" class="w-full text-center text-2xl font-bold bg-white border rounded p-1 text-green-800" value="855">
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- BASIC METRICS (PPV, NPV) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-purple-50 p-6 rounded-xl shadow-md border border-purple-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-xl font-bold text-purple-800">Positiver Vorhersagewert (PPV)</h3>
+                        <p class="text-sm text-purple-600 mb-2">Precision / Genauigkeit im Alarmfall</p>
+                    </div>
+                    <div class="text-3xl font-bold text-purple-700" id="out_ppv">29.6%</div>
+                </div>
+                <div class="text-sm text-slate-700 bg-white p-3 rounded mt-2">
+                    <strong>Bedeutung:</strong> Bei einer Alarmmeldung, ist das Tier nur zu <span id="out_ppv_text" class="font-bold">29.6%</span> wirklich krank. Die restlichen Alarme sind Fehlalarme.
+                </div>
+            </div>
+
+            <div class="bg-purple-50 p-6 rounded-xl shadow-md border border-purple-200">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-xl font-bold text-purple-800">Negativer Vorhersagewert (NPV)</h3>
+                        <p class="text-sm text-purple-600 mb-2">Sicherheit bei Ruhe</p>
+                    </div>
+                    <div class="text-3xl font-bold text-purple-700" id="out_npv">98.8%</div>
+                </div>
+                <div class="text-sm text-slate-700 bg-white p-3 rounded mt-2">
+                    <strong>Bedeutung:</strong> Ohne Alarm, ist das Tier zu <span id="out_npv_text" class="font-bold">98.8%</span> auch wirklich gesund.
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-12 mb-4 border-b-2 border-slate-300 pb-2">
+            <h2 class="text-2xl font-bold text-hawblue">3. Erweiterte Metriken & Systembewertung</h2>
+        </div>
+
+        <!-- ADVANCED METRICS -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <!-- Accuracy -->
+            <div class="bg-white p-5 rounded-xl shadow border border-slate-200 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-slate-400"></div>
+                <h3 class="font-bold text-slate-700 text-lg">Genauigkeit (Accuracy)</h3>
+                <div class="text-3xl font-bold text-slate-800 my-2" id="out_acc">89.5%</div>
+                <p class="text-xs text-slate-500">Anteil aller korrekten Entscheidungen (TP + TN) an allen Tieren.</p>
+                <div class="mt-3 p-2 bg-red-50 text-red-800 text-xs rounded border border-red-100" id="acc_warning">
+                    <strong>Achtung Accuracy-Falle:</strong> Bei niedriger Prävalenz oft irreführend hoch!
+                </div>
+            </div>
+
+            <!-- F1-Score -->
+            <div class="bg-white p-5 rounded-xl shadow border border-slate-200 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
+                <h3 class="font-bold text-slate-700 text-lg">F1-Score</h3>
+                <div class="text-3xl font-bold text-purple-600 my-2" id="out_f1">0.43</div>
+                <p class="text-xs text-slate-500">Harmonisches Mittel aus Precision und Sensitivität (Werte 0 bis 1).</p>
+                <p class="text-xs text-slate-600 mt-2 italic">Bewertet die Leistung bei unbalancierten Daten besser als die Accuracy.</p>
+            </div>
+
+            <!-- Youden Index -->
+            <div class="bg-white p-5 rounded-xl shadow border border-slate-200 relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                <h3 class="font-bold text-slate-700 text-lg">Youden-Index (J)</h3>
+                <div class="text-3xl font-bold text-blue-600 my-2" id="out_youden">0.70</div>
+                <p class="text-xs text-slate-500">Sensitivität + Spezifität - 1 (Werte -1 bis 1).</p>
+                <p class="text-xs text-slate-600 mt-2 italic">Gibt den vertikalen Abstand zur Zufallslinie an.</p>
+            </div>
+
+        </div>
+
+        <!-- ROC CHART -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 mt-8">
+            <h3 class="text-xl font-bold text-hawblue mb-4">ROC-Analyse (Visualisierung des Arbeitspunktes)</h3>
+            <div class="flex flex-col md:flex-row items-center gap-8">
+                <div class="w-full md:w-2/3 h-80 relative">
+                    <canvas id="rocChart"></canvas>
+                </div>
+                <div class="w-full md:w-1/3 text-sm text-slate-700 space-y-4">
+                    <p>Der <strong>rote Punkt</strong> zeigt die aktuelle Leistung des Sensors basierend auf Ihren Einstellungen für Sensitivität und Spezifität.</p>
+                    <ul class="list-disc pl-5 space-y-2">
+                        <li><strong>Y-Achse:</strong> Sensitivität (Wie viele Kranke werden gefunden?)</li>
+                        <li><strong>X-Achse:</strong> 1 - Spezifität (Falsch-Alarm-Rate)</li>
+                    </ul>
+                    <p class="p-3 bg-blue-50 border border-blue-100 rounded text-blue-800">
+                        Je weiter der rote Punkt in der oberen linken Ecke (weg von der gestrichelten Zufallslinie) liegt, desto besser trennt der Sensor zwischen kranken und gesunden Tieren.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="text-center text-slate-400 text-sm mt-12 pb-8">
+            &copy; 2026 HAW Kiel - Interaktives Lehrmodul Precision Livestock Farming
+        </footer>
+
+    </div>
+
+    <!-- JAVASCRIPT LOGIK -->
+    <script>
+        // DOM Elemente - Sliders
+        const sl_total = document.getElementById('slide_total');
+        const sl_prev = document.getElementById('slide_prev');
+        const sl_sens = document.getElementById('slide_sens');
+        const sl_spec = document.getElementById('slide_spec');
+
+        // DOM Elemente - Number Inputs & Labels
+        const num_total = document.getElementById('num_total');
+        const num_prev = document.getElementById('num_prev');
+        const num_sens = document.getElementById('num_sens');
+        const num_spec = document.getElementById('num_spec');
+        const num_sick = document.getElementById('num_sick');
+
+        // DOM Elemente - Matrix Inputs
+        const in_tp = document.getElementById('inp_tp');
+        const in_fp = document.getElementById('inp_fp');
+        const in_fn = document.getElementById('inp_fn');
+        const in_tn = document.getElementById('inp_tn');
+
+        // DOM Elemente - Outputs
+        const out_ppv = document.getElementById('out_ppv');
+        const out_ppv_text = document.getElementById('out_ppv_text');
+        const out_npv = document.getElementById('out_npv');
+        const out_npv_text = document.getElementById('out_npv_text');
+        const out_acc = document.getElementById('out_acc');
+        const out_f1 = document.getElementById('out_f1');
+        const out_youden = document.getElementById('out_youden');
+        const acc_warning = document.getElementById('acc_warning');
+
+        // Chart Instance
+        let rocChart = null;
+
+        // Hilfsfunktion: Formatierung
+        const fPct = (val) => isNaN(val) ? "N/A" : (val * 100).toFixed(1) + '%';
+        const fNum = (val) => isNaN(val) ? "N/A" : val.toFixed(2);
+
+        // INITIALISIERUNG CHART
+        function initChart() {
+            const ctx = document.getElementById('rocChart').getContext('2d');
+            rocChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Aktueller Sensor',
+                            data: [{x: 0.1, y: 0.8}], // Startwert
+                            backgroundColor: '#F44336',
+                            borderColor: '#F44336',
+                            pointRadius: 8,
+                            pointHoverRadius: 10,
+                            order: 1
+                        },
+                        {
+                            label: 'Zufallslinie',
+                            data: [{x:0, y:0}, {x:1, y:1}],
+                            type: 'line',
+                            borderColor: '#94a3b8',
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            order: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear', position: 'bottom', min: 0, max: 1,
+                            title: { display: true, text: '1 - Spezifität (Falsch-Positiv-Rate)', font: {weight: 'bold'} }
+                        },
+                        y: {
+                            type: 'linear', min: 0, max: 1,
+                            title: { display: true, text: 'Sensitivität (Richtig-Positiv-Rate)', font: {weight: 'bold'} }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    if(ctx.datasetIndex === 0) return `Sens: ${(ctx.parsed.y*100).toFixed(1)}%, 1-Spez: ${(ctx.parsed.x*100).toFixed(1)}%`;
+                                    return '';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // UPDATE LOGIK 1: Sliders -> Matrix -> Metriken
+        function updateFromSliders() {
+            let total = parseInt(sl_total.value);
+            let prev = parseFloat(sl_prev.value) / 100;
+            let sens = parseFloat(sl_sens.value) / 100;
+            let spec = parseFloat(sl_spec.value) / 100;
+
+            // Inputs / Labels Update
+            num_total.value = total;
+            num_prev.value = sl_prev.value;
+            num_sens.value = sl_sens.value;
+            num_spec.value = sl_spec.value;
+
+            // Berechne Wahrheit
+            let sick = Math.round(total * prev);
+            let healthy = total - sick;
+            num_sick.innerText = sick;
+
+            // Berechne Matrix
+            let tp = Math.round(sick * sens);
+            let fn = sick - tp;
+            let tn = Math.round(healthy * spec);
+            let fp = healthy - tn;
+
+            // Update Inputs
+            in_tp.value = tp;
+            in_fn.value = fn;
+            in_fp.value = fp;
+            in_tn.value = tn;
+
+            calculateMetrics(tp, fp, fn, tn);
+        }
+
+        // UPDATE LOGIK 2: Matrix Inputs -> Sliders -> Metriken
+        function updateFromInputs() {
+            let tp = parseInt(in_tp.value) || 0;
+            let fp = parseInt(in_fp.value) || 0;
+            let fn = parseInt(in_fn.value) || 0;
+            let tn = parseInt(in_tn.value) || 0;
+
+            let sick = tp + fn;
+            let healthy = fp + tn;
+            let total = sick + healthy;
+
+            let prev = total > 0 ? (sick / total) : 0;
+            let sens = sick > 0 ? (tp / sick) : 0;
+            let spec = healthy > 0 ? (tn / healthy) : 0;
+
+            // Update Sliders (Vermeide Endlosschleife durch Abkapseln)
+            sl_total.value = total;
+            sl_prev.value = (prev * 100).toFixed(1);
+            sl_sens.value = (sens * 100).toFixed(1);
+            sl_spec.value = (spec * 100).toFixed(1);
+
+            // Inputs / Labels Update
+            num_total.value = total;
+            num_prev.value = (prev * 100).toFixed(1);
+            num_sens.value = (sens * 100).toFixed(1);
+            num_spec.value = (spec * 100).toFixed(1);
+            num_sick.innerText = sick;
+
+            calculateMetrics(tp, fp, fn, tn);
+        }
+
+        // UPDATE LOGIK 3: Number Inputs -> Sliders
+        function syncFromNumberInputs() {
+            let t = parseInt(num_total.value) || 10;
+            let p = parseFloat(num_prev.value) || 0;
+            let se = parseFloat(num_sens.value) || 0;
+            let sp = parseFloat(num_spec.value) || 0;
+            
+            // Grenzen absichern
+            if(t > 1000) t = 1000;
+            if(t < 10) t = 10;
+            if(p > 100) p = 100;
+            if(p < 0) p = 0;
+            if(se > 100) se = 100;
+            if(se < 0) se = 0;
+            if(sp > 100) sp = 100;
+            if(sp < 0) sp = 0;
+            
+            sl_total.value = t;
+            sl_prev.value = p;
+            sl_sens.value = se;
+            sl_spec.value = sp;
+            
+            updateFromSliders();
+        }
+
+        // BERECHNUNG DER METRIKEN
+        function calculateMetrics(tp, fp, fn, tn) {
+            let sick = tp + fn;
+            let healthy = fp + tn;
+            let total = sick + healthy;
+            let alarms = tp + fp;
+            let noalarms = tn + fn;
+
+            // Sens & Spec (Y & X der ROC Kurve)
+            let sens = sick > 0 ? (tp / sick) : 0;
+            let spec = healthy > 0 ? (tn / healthy) : 0;
+
+            // PPV & NPV
+            let ppv = alarms > 0 ? (tp / alarms) : 0;
+            let npv = noalarms > 0 ? (tn / noalarms) : 0;
+
+            // Acc, Youden, F1
+            let acc = total > 0 ? ((tp + tn) / total) : 0;
+            let youden = sens + spec - 1;
+            let f1 = (ppv + sens) > 0 ? (2 * (ppv * sens) / (ppv + sens)) : 0;
+
+            // Update DOM Output
+            out_ppv.innerText = fPct(ppv);
+            out_ppv_text.innerText = fPct(ppv);
+            out_npv.innerText = fPct(npv);
+            out_npv_text.innerText = fPct(npv);
+            
+            out_acc.innerText = fPct(acc);
+            out_f1.innerText = fNum(f1);
+            out_youden.innerText = fNum(youden);
+
+            // Accuracy Warning
+            let prev = total > 0 ? (sick / total) : 0;
+            if (prev < 0.1 && acc > 0.8 && sens < 0.5) {
+                acc_warning.style.display = 'block';
+            } else {
+                acc_warning.style.display = 'none';
+            }
+
+            updateChart(sens, spec);
+        }
+
+        // UPDATE CHART MIT AKTUELLEM SENSORPUNKT
+        function updateChart(sens, spec) {
+            if(!rocChart) return;
+
+            // Der rote Punkt
+            let fpr = 1 - spec;
+            let tpr = sens;
+
+            rocChart.data.datasets[0].data = [{x: fpr, y: tpr}];
+            rocChart.update();
+        }
+
+        // EVENT LISTENER
+        [sl_total, sl_prev, sl_sens, sl_spec].forEach(slider => {
+            slider.addEventListener('input', updateFromSliders);
+        });
+
+        [num_total, num_prev, num_sens, num_spec].forEach(input => {
+            input.addEventListener('input', syncFromNumberInputs);
+        });
+
+        [in_tp, in_fp, in_fn, in_tn].forEach(input => {
+            input.addEventListener('input', updateFromInputs);
+        });
+
+        // INIT
+        window.onload = function() {
+            initChart();
+            updateFromSliders();
+        };
+
+    </script>
+</body>
+</html>
