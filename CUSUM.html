@@ -66,7 +66,7 @@
                                 <input type="number" id="num_crit" value="72.0" step="0.5" class="w-16 text-center border rounded font-bold text-red-600 border-red-300 focus:outline-none">
                             </div>
                             <input type="range" id="sl_crit" min="68" max="80" step="0.5" value="72.0" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-red-500">
-                            <p class="text-xs text-slate-500 mt-1">Ab diesem THI-Wert gibt ein normales System sofort Alarm.</p>
+                            <p class="text-xs text-slate-500 mt-1">THI-Wert für Alarmmeldung bei starrem System</p>
                         </div>
                     </div>
                 </div>
@@ -125,7 +125,7 @@
                 <!-- Chart 1: Acute -->
                 <div class="bg-white p-4 rounded-xl shadow-md border border-slate-200">
                     <h3 class="font-bold text-slate-700">Szenario 1: Akuter Hitzestress</h3>
-                    <p class="text-xs text-slate-500 mb-2">Deutlicher Anstieg über THI 72. Die einfache Schwellenwert-Logik erkennt das Problem sofort.</p>
+                    <p class="text-xs text-slate-500 mb-2">Deutlicher Anstieg über THI 72 --> einfache Schwellenwert-Logik</p>
                     <div class="h-48 relative">
                         <canvas id="chart1"></canvas>
                     </div>
@@ -134,7 +134,7 @@
                 <!-- Chart 2: Chronic Raw -->
                 <div class="bg-white p-4 rounded-xl shadow-md border border-slate-200">
                     <h3 class="font-bold text-slate-700">Szenario 2: Schleichender Hitzestress (Rohdaten)</h3>
-                    <p class="text-xs text-slate-500 mb-2">Der THI steigt, bleibt aber knapp unter der Schwelle. Der starre Alarm löst <span class="text-red-600 font-bold">nicht</span> aus.</p>
+                    <p class="text-xs text-slate-500 mb-2"> </p>
                     <div class="h-48 relative">
                         <canvas id="chart2"></canvas>
                     </div>
@@ -143,7 +143,7 @@
                 <!-- Chart 3: Chronic CUSUM -->
                 <div class="bg-white p-4 rounded-xl shadow-md border border-arrowpurple">
                     <h3 class="font-bold text-arrowpurple">Szenario 2: CUSUM Auswertung</h3>
-                    <p class="text-xs text-slate-600 mb-2">Das CUSUM-Verfahren summiert die Fehler stetig auf und löst bei Durchbrechen der Alarmgrenze aus.</p>
+                    <p class="text-xs text-slate-600 mb-2"> CUSUM-Verfahren summiert die Fehler stetig auf und löst bei Durchbrechen der Alarmgrenze aus</p>
                     <div class="h-48 relative">
                         <canvas id="chart3"></canvas>
                     </div>
@@ -156,7 +156,7 @@
         <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 mt-8">
             <div class="flex justify-between items-end mb-4 border-b pb-2">
                 <div>
-                    <h2 class="text-xl font-bold text-hawblue">4. Die Mathematik hinter CUSUM (Schritt-für-Schritt)</h2>
+                    <h2 class="text-xl font-bold text-hawblue">4. CUSUM Schritt-für-Schritt</h2>
                     <p class="text-sm text-slate-600 mt-1">Live-Berechnung für <strong>Szenario 2</strong>. Die Formel rechnet Tag für Tag den alten CUSUM-Wert mit der neuen Abweichung gegen.</p>
                 </div>
                 <div class="bg-slate-100 p-2 rounded text-sm font-mono border border-slate-300 shadow-inner">
