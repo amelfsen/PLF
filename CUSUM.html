@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CUSUM Analyse für Hitzestress (THI)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        hawblue: '#003366',
+                        plfgreen: '#4CAF50',
+                        plfred: '#F44336',
+                        arrowpurple: '#9C27B0',
+                        cusumorange: '#FF9800'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        
+        /* Custom Scrollbar für die Tabelle */
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <!-- HEADER -->
+        <header class="bg-hawblue text-white p-6 rounded-xl shadow-lg flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold">PLF Algorithmen: CUSUM Kontrollkarten</h1>
+                <p class="text-blue-200 mt-2">Früherkennung von chronischem Hitzestress (THI) unterhalb klassischer Schwellenwerte</p>
+            </div>
+            <div class="text-right hidden md:block">
+                <p class="text-sm italic">HAW Kiel</p>
+                <p class="text-sm font-semibold">FB Agrarwirtschaft</p>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT: CONTROLS & CHARTS -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- CONTROLS (Left Column) -->
+            <div class="lg:col-span-1 space-y-6">
+                
+                <!-- Basis Settings -->
+                <div class="bg-white p-5 rounded-xl shadow-md border border-slate-200">
+                    <h2 class="text-lg font-bold text-hawblue mb-4 border-b pb-2">1. Klassischer Alarm</h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="font-semibold text-slate-700 text-sm">Starrer Schwellenwert (THI):</label>
+                                <input type="number" id="num_crit" value="72.0" step="0.5" class="w-16 text-center border rounded font-bold text-red-600 border-red-300 focus:outline-none">
+                            </div>
+                            <input type="range" id="sl_crit" min="68" max="80" step="0.5" value="72.0" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-red-500">
+                            <p class="text-xs text-slate-500 mt-1">Ab diesem THI-Wert gibt ein normales System sofort Alarm.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CUSUM Settings -->
+                <div class="bg-white p-5 rounded-xl shadow-md border border-slate-200">
+                    <h2 class="text-lg font-bold text-arrowpurple mb-4 border-b pb-2">2. CUSUM Parameter</h2>
+                    
+                    <div class="space-y-5">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="font-semibold text-slate-700 text-sm">Zielwert (Normal-THI):</label>
+                                <input type="number" id="num_target" value="68.0" step="0.5" class="w-16 text-center border rounded font-bold text-hawblue border-blue-300 focus:outline-none">
+                            </div>
+                            <input type="range" id="sl_target" min="60" max="72" step="0.5" value="68.0" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-hawblue">
+                            <p class="text-xs text-slate-500 mt-1">Der optimale Wohlfühl-Wert für die Tiere.</p>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="font-semibold text-slate-700 text-sm">Toleranzband (Slack k):</label>
+                                <input type="number" id="num_slack" value="0.5" step="0.1" class="w-16 text-center border rounded font-bold text-slate-600 border-slate-300 focus:outline-none">
+                            </div>
+                            <input type="range" id="sl_slack" min="0" max="3" step="0.1" value="0.5" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-500">
+                            <p class="text-xs text-slate-500 mt-1">Erlaubte Puffer-Abweichung, bevor CUSUM aufsummiert.</p>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="font-semibold text-slate-700 text-sm">CUSUM Alarmgrenze (h):</label>
+                                <input type="number" id="num_limit" value="15.0" step="1" class="w-16 text-center border rounded font-bold text-cusumorange border-orange-300 focus:outline-none">
+                            </div>
+                            <input type="range" id="sl_limit" min="1" max="50" step="1" value="15.0" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-500">
+                            <p class="text-xs text-slate-500 mt-1">Schwelle für den dauerhaften (chronischen) Stress-Alarm.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulation Tweaks -->
+                <div class="bg-blue-50 p-5 rounded-xl shadow-md border border-blue-100">
+                    <h2 class="text-lg font-bold text-hawblue mb-4 border-b border-blue-200 pb-2">3. Szenario anpassen</h2>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="font-semibold text-slate-700 text-sm">Max. THI in Szenario 2:</label>
+                            <input type="number" id="num_sz2max" value="71.0" step="0.1" class="w-16 text-center border rounded font-bold text-blue-800 border-blue-300 focus:outline-none">
+                        </div>
+                        <input type="range" id="sl_sz2max" min="68" max="75" step="0.1" value="71.0" class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                        <p class="text-xs text-blue-600 mt-1">Verändern Sie das Plateau des chronischen Hitzestresses.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CHARTS (Right Column) -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- Chart 1: Acute -->
+                <div class="bg-white p-4 rounded-xl shadow-md border border-slate-200">
+                    <h3 class="font-bold text-slate-700">Szenario 1: Akuter Hitzestress</h3>
+                    <p class="text-xs text-slate-500 mb-2">Deutlicher Anstieg über THI 72. Die einfache Schwellenwert-Logik erkennt das Problem sofort.</p>
+                    <div class="h-48 relative">
+                        <canvas id="chart1"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 2: Chronic Raw -->
+                <div class="bg-white p-4 rounded-xl shadow-md border border-slate-200">
+                    <h3 class="font-bold text-slate-700">Szenario 2: Schleichender Hitzestress (Rohdaten)</h3>
+                    <p class="text-xs text-slate-500 mb-2">Der THI steigt, bleibt aber knapp unter der Schwelle. Der starre Alarm löst <span class="text-red-600 font-bold">nicht</span> aus.</p>
+                    <div class="h-48 relative">
+                        <canvas id="chart2"></canvas>
+                    </div>
+                </div>
+
+                <!-- Chart 3: Chronic CUSUM -->
+                <div class="bg-white p-4 rounded-xl shadow-md border border-arrowpurple">
+                    <h3 class="font-bold text-arrowpurple">Szenario 2: CUSUM Auswertung</h3>
+                    <p class="text-xs text-slate-600 mb-2">Das CUSUM-Verfahren summiert die Fehler stetig auf und löst bei Durchbrechen der Alarmgrenze aus.</p>
+                    <div class="h-48 relative">
+                        <canvas id="chart3"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- NEW: CUSUM CALCULATION TABLE -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 mt-8">
+            <div class="flex justify-between items-end mb-4 border-b pb-2">
+                <div>
+                    <h2 class="text-xl font-bold text-hawblue">4. Die Mathematik hinter CUSUM (Schritt-für-Schritt)</h2>
+                    <p class="text-sm text-slate-600 mt-1">Live-Berechnung für <strong>Szenario 2</strong>. Die Formel rechnet Tag für Tag den alten CUSUM-Wert mit der neuen Abweichung gegen.</p>
+                </div>
+                <div class="bg-slate-100 p-2 rounded text-sm font-mono border border-slate-300 shadow-inner">
+                    S_neu = max(0, S_alt + (THI - Zielwert - Toleranz))
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto overflow-y-auto h-80 border rounded-lg custom-scrollbar">
+                <table class="w-full text-sm text-center border-collapse" id="calcTable">
+                    <thead class="bg-slate-100 sticky top-0 shadow-sm outline outline-1 outline-slate-200 z-10">
+                        <tr>
+                            <th class="p-3 border-r text-slate-700">Tag</th>
+                            <th class="p-3 border-r text-hawblue">Messwert (THI)</th>
+                            <th class="p-3 border-r text-slate-500">Formel: Abweichung<br><span class="font-normal text-xs">(THI - Ziel - Toleranz)</span></th>
+                            <th class="p-3 border-r text-slate-500">CUSUM Vortag ($S_{alt}$)</th>
+                            <th class="p-3 bg-purple-100 text-purple-800 border-b-2 border-purple-300">Neuer CUSUM ($S_{neu}$)</th>
+                            <th class="p-3 bg-slate-100 text-slate-700 text-left pl-6">Alarm Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calcTableBody">
+                        <!-- Wird dynamisch durch JS befüllt -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer class="text-center text-slate-400 text-sm pb-8">
+            &copy; 2026 HAW Kiel - Interaktives Lehrmodul Precision Livestock Farming
+        </footer>
+
+    </div>
+
+    <script>
+        // --- DATA GENERATION (Deterministic Randomness) ---
+        function randn_bm() {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random();
+            while(v === 0) v = Math.random();
+            return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+        }
+
+        const days = 60;
+        const labels = Array.from({length: days}, (_, i) => `Tag ${i+1}`);
+        const noise1 = Array.from({length: days}, randn_bm);
+        const noise2 = Array.from({length: days}, randn_bm);
+
+        // State Variables
+        let thiCrit = 72.0;
+        let thiTarget = 68.0;
+        let slack = 0.5;
+        let cusumLimit = 15.0;
+        let sz2Max = 71.0;
+
+        let dataSz1 = [];
+        let dataSz2 = [];
+        let dataCusum = [];
+
+        // DOM Elements
+        const ids = ['crit', 'target', 'slack', 'limit', 'sz2max'];
+        const inputs = {};
+        ids.forEach(id => {
+            inputs[id] = {
+                sl: document.getElementById('sl_' + id),
+                num: document.getElementById('num_' + id)
+            };
+        });
+
+        // Charts references
+        let c1, c2, c3;
+
+        // --- MATH & UPDATE LOGIC ---
+        function generateData() {
+            dataSz1 = [];
+            dataSz2 = [];
+            dataCusum = [];
+
+            let currentCusum = 0;
+
+            for(let i=0; i<days; i++) {
+                // Sz 1 Logic
+                let val1 = 0;
+                if (i < 20) val1 = 68.0 + noise1[i] * 0.8;
+                else if (i < 35) val1 = 68.0 + ((77.0 - 68.0)/15) * (i-20) + noise1[i] * 0.8;
+                else val1 = 77.0 + noise1[i] * 1.0;
+                dataSz1.push(val1);
+
+                // Sz 2 Logic
+                let val2 = 0;
+                if (i < 20) val2 = 68.0 + noise2[i] * 0.8;
+                else if (i < 40) val2 = 68.0 + ((sz2Max - 68.0)/20) * (i-20) + noise2[i] * 0.4;
+                else val2 = sz2Max + noise2[i] * 0.4;
+                
+                if(sz2Max <= 71.5 && val2 >= 72.0) val2 = 71.9; 
+                dataSz2.push(val2);
+
+                // CUSUM Logic
+                if (i > 0) {
+                    let deviation = val2 - thiTarget - slack;
+                    currentCusum = Math.max(0, currentCusum + deviation);
+                } else {
+                    currentCusum = 0;
+                }
+                dataCusum.push(currentCusum);
+            }
+        }
+
+        function syncInputs(source, id) {
+            let val = parseFloat(source.value);
+            if(source.type === 'number') {
+                let min = parseFloat(inputs[id].sl.min);
+                let max = parseFloat(inputs[id].sl.max);
+                if(val < min) val = min;
+                if(val > max) val = max;
+                inputs[id].sl.value = val;
+                inputs[id].num.value = val;
+            } else {
+                inputs[id].num.value = val;
+            }
+
+            if(id==='crit') thiCrit = val;
+            if(id==='target') thiTarget = val;
+            if(id==='slack') slack = val;
+            if(id==='limit') cusumLimit = val;
+            if(id==='sz2max') sz2Max = val;
+
+            generateData();
+            updateCharts();
+            updateTable(); 
+        }
+
+        // --- CALCULATION TABLE UPDATE ---
+        function updateTable() {
+            const tbody = document.getElementById('calcTableBody');
+            let html = '';
+            let s_alt = 0;
+            
+            for(let i=0; i<days; i++) {
+                let thi = dataSz2[i];
+                let deviation = thi - thiTarget - slack;
+                let s_neu = dataCusum[i];
+                
+                let rowClass = "hover:bg-slate-50";
+                let alarmText = "<span class='text-slate-400'>-</span>";
+                
+                // Diff calculating (with small rounding to avoid JS float artifacts)
+                let diff = Math.round((s_neu - s_alt) * 1000) / 1000;
+                
+                // Akademisch präzise Statusauswertung
+                if (s_neu >= cusumLimit) {
+                    rowClass = "bg-orange-50 font-semibold";
+                    alarmText = "<span class='text-orange-600 font-bold'>ALARM</span>";
+                } else if (diff > 0) {
+                    rowClass = "bg-purple-50/50";
+                    alarmText = "<span class='text-purple-600 font-semibold'>↗ Anstieg</span>";
+                } else if (diff < 0) {
+                    rowClass = "hover:bg-slate-50";
+                    alarmText = "<span class='text-green-600 font-semibold'>↘ Abbau</span>";
+                } else if (s_neu > 0 && diff === 0) {
+                    rowClass = "bg-purple-50/20";
+                    alarmText = "<span class='text-purple-500'>→ Konstant</span>";
+                }
+
+                html += `<tr class="border-b border-slate-200 ${rowClass}">
+                    <td class="p-2 border-r text-slate-600">Tag ${i+1}</td>
+                    <td class="p-2 border-r font-medium text-hawblue">${thi.toFixed(2)}</td>
+                    <td class="p-2 border-r ${deviation > 0 ? 'text-red-500 font-semibold' : 'text-slate-400'}">${deviation > 0 ? '+' : ''}${deviation.toFixed(2)}</td>
+                    <td class="p-2 border-r text-slate-500">${s_alt.toFixed(2)}</td>
+                    <td class="p-2 border-r text-lg font-bold ${s_neu > 0 ? 'text-arrowpurple' : 'text-slate-300'}">${s_neu.toFixed(2)}</td>
+                    <td class="p-2 text-left pl-6">${alarmText}</td>
+                </tr>`;
+                
+                s_alt = s_neu; 
+            }
+            tbody.innerHTML = html;
+        }
+
+        // --- CHART SETUP ---
+        function initCharts() {
+            Chart.defaults.font.family = "'DM Sans', sans-serif";
+            
+            const commonOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                interaction: { intersect: false, mode: 'index' },
+            };
+
+            // CHART 1 (Acute)
+            const ctx1 = document.getElementById('chart1').getContext('2d');
+            c1 = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'THI Wert',
+                            data: dataSz1,
+                            borderColor: '#003366',
+                            backgroundColor: '#003366',
+                            borderWidth: 2,
+                            pointRadius: 1,
+                            fill: {
+                                target: 1, // Füllt NUR in Richtung Dataset 1 (Threshold)
+                                above: 'rgba(244, 67, 54, 0.4)', // Färbt, wenn THI > Threshold
+                                below: 'transparent'             // Keine Farbe, wenn THI < Threshold
+                            }
+                        },
+                        {
+                            label: 'Kritische Schwelle',
+                            data: Array(days).fill(thiCrit),
+                            borderColor: '#F44336',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false // Threshold füllt nichts
+                        }
+                    ]
+                },
+                options: {
+                    ...commonOptions,
+                    scales: { y: { min: 65, max: 80, title: {display: true, text: 'THI'} }, x: { ticks: {maxTicksLimit: 10} } }
+                }
+            });
+
+            // CHART 2 (Chronic)
+            const ctx2 = document.getElementById('chart2').getContext('2d');
+            c2 = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'THI Wert',
+                            data: dataSz2,
+                            borderColor: '#2196F3',
+                            backgroundColor: '#2196F3',
+                            borderWidth: 2,
+                            pointRadius: 1,
+                            fill: {
+                                target: 1,
+                                above: 'rgba(244, 67, 54, 0.4)', 
+                                below: 'transparent'             
+                            }
+                        },
+                        {
+                            label: 'Kritische Schwelle',
+                            data: Array(days).fill(thiCrit),
+                            borderColor: '#F44336',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    ...commonOptions,
+                    scales: { y: { min: 65, max: 80, title: {display: true, text: 'THI'} }, x: { ticks: {maxTicksLimit: 10} } }
+                }
+            });
+
+            // CHART 3 (CUSUM)
+            const ctx3 = document.getElementById('chart3').getContext('2d');
+            c3 = new Chart(ctx3, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'CUSUM Summe',
+                            data: dataCusum,
+                            borderColor: '#9C27B0',
+                            backgroundColor: '#9C27B0',
+                            borderWidth: 2,
+                            pointRadius: 1,
+                            fill: {
+                                target: 1,
+                                above: 'rgba(255, 152, 0, 0.4)', // Färbt Alarmbereich orange
+                                below: 'transparent'             
+                            }
+                        },
+                        {
+                            label: 'Alarmgrenze',
+                            data: Array(days).fill(cusumLimit),
+                            borderColor: '#FF9800',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    ...commonOptions,
+                    scales: { y: { suggestedMin: 0, suggestedMax: 30, title: {display: true, text: 'CUSUM Wert'} }, x: { ticks: {maxTicksLimit: 10} } }
+                }
+            });
+        }
+
+        function updateCharts() {
+            c1.data.datasets[0].data = dataSz1;
+            c1.data.datasets[1].data = Array(days).fill(thiCrit);
+            c1.update();
+
+            c2.data.datasets[0].data = dataSz2;
+            c2.data.datasets[1].data = Array(days).fill(thiCrit);
+            c2.update();
+
+            c3.data.datasets[0].data = dataCusum;
+            c3.data.datasets[1].data = Array(days).fill(cusumLimit);
+            c3.update();
+        }
+
+        // --- EVENT LISTENERS ---
+        ids.forEach(id => {
+            inputs[id].sl.addEventListener('input', (e) => syncInputs(e.target, id));
+            inputs[id].num.addEventListener('input', (e) => syncInputs(e.target, id));
+        });
+
+        // --- INIT ---
+        window.onload = () => {
+            generateData();
+            initCharts();
+            updateTable(); 
+        };
+
+    </script>
+</body>
+</html>
