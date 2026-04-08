@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HAW | Belegungsmanagement Schweinehaltung</title>
+    <!-- Stabile Bibliotheken über CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Verwende Babel 7.21.4 zur Vermeidung des "Infinity" Syntaxfehlers -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.21.4/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide-react@latest"></script>
+    
+    <style>
+        .grid-cols-52 {
+            display: grid;
+            grid-template-columns: repeat(52, minmax(0, 1fr));
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #ef4444;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            margin-top: -6px;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type="range"]:focus {
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #e2e8f0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Sicherer Zugriff auf globale React-Objekte
+        const { useState, useMemo } = React;
+
+        const App = () => {
+            // Sicherstellen, dass Icons geladen sind, sonst Fallbacks
+            const lr = window.lucideReact || {};
+            const Users = lr.Users || (() => null);
+            const Settings = lr.Settings || (() => null);
+            const RotateCcw = lr.RotateCcw || (() => null);
+            const Calendar = lr.Calendar || (() => null);
+            const Layers = lr.Layers || (() => null);
+            const Droplets = lr.Droplets || (() => null);
+            const Info = lr.Info || (() => null);
+            const Home = lr.Home || (() => null);
+
+            // Betriebsparameter
+            const [sowCount, setSowCount] = useState(250);
+            const [weaningWeeks, setWeaningWeeks] = useState(4); 
+            const [rhythmWeeks, setRhythmWeeks] = useState(3);
+            const [currentWeek, setCurrentWeek] = useState(0);
+            const [mode, setMode] = useState('alt'); // Startet standardmäßig mit Status Quo
+
+            const SERVICE_TIME_W = 1; // 1 Woche Reinigung & Desinfektion
+
+            // Konfigurationen Status Quo vs. Novellierung
+            const config = {
+                alt: {
+                    serviceW: 5, areaService: 1.6, gestationW: 11, areaGestation: 2.25, areaFarrowing: 5.0,
+                    label: "Status Quo (Alt)",
+                    description: "Haltungssystem mit langer Fixationsdauer im Deckzentrum (5 Wochen) und geringem Flächenansatz."
+                },
+                neu: {
+                    serviceW: 1, areaService: 5.0, gestationW: 15, areaGestation: 2.25, areaFarrowing: 6.5,
+                    label: "TierSchNutztV (Neu)",
+                    description: "System nach neuer Verordnung: Minimale Fixation (1 Woche) und deutlich erhöhter Flächenbedarf."
+                }
+            };
+
+            const currentConfig = config[mode];
+
+            const calculations = useMemo(() => {
+                const farrowingAreaW = 1 + weaningWeeks; // 1w Vorbereitung + Säugezeit
+                const bioCycleW = currentConfig.serviceW + currentConfig.gestationW + farrowingAreaW;
+                const numGroups = Math.ceil(bioCycleW / rhythmWeeks);
+                const sowsPerGroup = Math.ceil(sowCount / numGroups);
+
+                // Bauliche Bedarfsplanung (Anzahl Abteile)
+                // Berücksichtigung von Tierpräsenz + Servicezeit (R&D)
+                const reqDeptService = Math.ceil((currentConfig.serviceW + SERVICE_TIME_W) / rhythmWeeks);
+                const reqDeptGestation = Math.ceil(currentConfig.gestationW / rhythmWeeks);
+                const reqDeptFarrowing = Math.ceil((farrowingAreaW + SERVICE_TIME_W) / rhythmWeeks);
+
+                // Platzberechnung (Gruppengröße * Anzahl Abteile)
+                const totalPlacesService = reqDeptService * sowsPerGroup;
+                const totalPlacesGestation = reqDeptGestation * sowsPerGroup;
+                const totalPlacesFarrowing = reqDeptFarrowing * sowsPerGroup;
+                
+                // Gesamtsumme aller Plätze im System
+                const grandTotalPlaces = totalPlacesService + totalPlacesGestation + totalPlacesFarrowing;
+
+                const phases = [
+                    { id: 'service', name: 'Deckzentrum', duration: currentConfig.serviceW, color: 'bg-blue-600' },
+                    { id: 'gestation', name: 'Wartestall', duration: currentConfig.gestationW, color: 'bg-emerald-500' },
+                    { id: 'farrowing', name: 'Abferkelstall', duration: farrowingAreaW, color: 'bg-pink-600' }
+                ];
+
+                const groupStates = Array.from({ length: numGroups }).map((_, idx) => {
+                    const groupOffset = idx * rhythmWeeks;
+                    const weekInBio = (currentWeek - groupOffset + (500 * bioCycleW)) % bioCycleW;
+                    const weekFloor = Math.floor(weekInBio);
+                    
+                    let cumulative = 0;
+                    let activePhase = phases[phases.length - 1]; 
+                    for (const p of phases) {
+                        if (weekInBio >= cumulative && weekInBio < cumulative + p.duration) {
+                            activePhase = p;
+                            break;
+                        }
+                        cumulative += p.duration;
+                    }
+
+                    // Raum-Status: Serviceperiode (R&D)
+                    const isCleaningAF = (weekFloor === 0);
+                    const isCleaningDZ = (weekFloor === currentConfig.serviceW);
+
+                    return { 
+                        groupNum: idx + 1, 
+                        phase: activePhase, 
+                        isCleaningAF,
+                        isCleaningDZ,
+                        offset: groupOffset,
+                        bioCycleW
+                    };
+                });
+
+                return { 
+                    numGroups, sowsPerGroup, phases, groupStates, bioCycleW, 
+                    reqDeptService, reqDeptGestation, reqDeptFarrowing,
+                    totalPlacesService, totalPlacesGestation, totalPlacesFarrowing,
+                    grandTotalPlaces
+                };
+            }, [sowCount, weaningWeeks, rhythmWeeks, currentWeek, mode, currentConfig]);
+
+            return (
+                <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-900 select-none">
+                    <header className="max-w-7xl mx-auto mb-8 flex flex-col gap-6">
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-slate-800 p-3 rounded-lg text-white shadow-md">
+                                    <RotateCcw size={24} />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold tracking-tight uppercase">Belegungsmanagement Schweinehaltung</h1>
+                                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest italic">Analyse der Umbau-Konsequenzen im 52-Wochen-Raster</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-8">
+                                <div className="text-center">
+                                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Gruppen</span>
+                                    <span className="text-2xl font-black text-slate-800">{calculations.numGroups}</span>
+                                </div>
+                                <div className="text-center border-l pl-8 border-slate-200">
+                                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Sauen / Grp.</span>
+                                    <span className="text-2xl font-black text-slate-800">{calculations.sowsPerGroup}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm w-fit self-center">
+                            <button onClick={() => setMode('alt')} className={`px-8 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${mode === 'alt' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Blatt 1: Status Quo</button>
+                            <button onClick={() => setMode('neu')} className={`px-8 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${mode === 'neu' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}>Blatt 2: TierSchNutztV</button>
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
+                        <aside className="lg:col-span-1 space-y-6">
+                            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 justify-center border-b pb-2">
+                                    <Settings size={14} /> Parameter
+                                </h2>
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-600 mb-2 uppercase tracking-tight">Bestand [Sauen]</label>
+                                        <input type="number" value={sowCount} onChange={(e) => setSowCount(Math.max(1, parseInt(e.target.value) || 0))} className="w-full px-4 py-2 bg-slate-50 border border-slate-300 rounded font-mono text-sm focus:ring-1 focus:ring-slate-400 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-600 mb-2 uppercase tracking-tight">Säugedauer</label>
+                                        <div className="flex gap-1">
+                                            {[3, 4, 5].map(w => <button key={w} onClick={() => setWeaningWeeks(w)} className={`flex-1 py-2 text-xs font-bold rounded border transition-all ${weaningWeeks === w ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>{w} Wo.</button>)}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-600 mb-2 uppercase tracking-tight">Rhythmus</label>
+                                        <div className="grid grid-cols-2 gap-1">
+                                            {[1, 2, 3, 4].map(w => <button key={w} onClick={() => setRhythmWeeks(w)} className={`py-2 text-xs font-bold rounded border transition-all ${rhythmWeeks === w ? 'bg-slate-800 text-white border-slate-800 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'}`}>{w} Wo.</button>)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 justify-center border-b pb-2 text-center">
+                                    <Home size={14} /> Baulicher Bedarf ({calculations.grandTotalPlaces} Pl.)
+                                </h2>
+                                <div className="space-y-6">
+                                    <div className="border-b pb-3 border-slate-50">
+                                        <div className="flex justify-between items-end mb-1">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase">Deckzentrum</span>
+                                            <span className="text-xl font-black text-blue-600">{calculations.reqDeptService} <small className="text-[10px] text-slate-400 uppercase">Abteile</small></span>
+                                        </div>
+                                        <div className="flex justify-between text-[10px] text-slate-500">
+                                            <span>Plätze / Abteil:</span>
+                                            <span className="font-bold text-slate-800">{calculations.sowsPerGroup}</span>
+                                        </div>
+                                        <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                                            <span>Kapazität gesamt:</span>
+                                            <span className="font-bold text-slate-800">{calculations.totalPlacesService} Plätze</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-b pb-3 border-slate-50">
+                                        <div className="flex justify-between items-end mb-1">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase">Wartestall</span>
+                                            <span className="text-xl font-black text-emerald-600">{calculations.reqDeptGestation} <small className="text-[10px] text-slate-400 uppercase">Abteile</small></span>
+                                        </div>
+                                        <div className="flex justify-between text-[10px] text-slate-500">
+                                            <span>Plätze / Abteil:</span>
+                                            <span className="font-bold text-slate-800">{calculations.sowsPerGroup}</span>
+                                        </div>
+                                        <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                                            <span>Kapazität gesamt:</span>
+                                            <span className="font-bold text-slate-800">{calculations.totalPlacesGestation} Plätze</span>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div className="flex justify-between items-end mb-1">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase">Abferkelstall</span>
+                                            <span className="text-xl font-black text-pink-600">{calculations.reqDeptFarrowing} <small className="text-[10px] text-slate-400 uppercase">Abteile</small></span>
+                                        </div>
+                                        <div className="flex justify-between text-[10px] text-slate-500">
+                                            <span>Plätze / Abteil:</span>
+                                            <span className="font-bold text-slate-800">{calculations.sowsPerGroup}</span>
+                                        </div>
+                                        <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                                            <span>Kapazität gesamt:</span>
+                                            <span className="font-bold text-slate-800">{calculations.totalPlacesFarrowing} Plätze</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-amber-50 border border-amber-100 p-5 rounded-xl text-[11px] text-amber-900 leading-relaxed shadow-sm">
+                                <h3 className="font-bold mb-2 flex items-center gap-1 uppercase text-[10px] text-amber-800">
+                                    <Info size={14} /> System-Status
+                                </h3>
+                                <p className="font-bold mb-1">{currentConfig.label}</p>
+                                <p>{currentConfig.description}</p>
+                            </div>
+                        </aside>
+
+                        <main className="lg:col-span-3 space-y-6">
+                            <section className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm overflow-visible relative">
+                                <div className="flex justify-between items-center mb-10">
+                                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                        <Calendar size={18} className="text-slate-400" /> Biologische Kaskade (52 Wochen)
+                                    </h3>
+                                    <div className="text-[10px] font-bold text-blue-800 bg-blue-50 px-4 py-2 rounded border border-blue-100 uppercase tracking-wider">Woche {currentWeek}</div>
+                                </div>
+
+                                <div className="relative">
+                                    <div className="flex mb-4 ml-24 h-6">
+                                        {Array.from({ length: 14 }).map((_, i) => (
+                                            <div key={i} className="flex-1 relative" style={{ flexBasis: `${(4/52)*100}%` }}>
+                                                <span className="absolute -left-2 text-[8px] font-black text-slate-400 uppercase">W{i * 4}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="relative z-10 space-y-2 mb-10">
+                                        {calculations.groupStates.map((g, idx) => (
+                                            <div key={idx} className="flex items-center h-8">
+                                                <div className="w-24 shrink-0 text-[10px] font-bold text-slate-400 uppercase">Gruppe {g.groupNum}</div>
+                                                <div className="flex-1 relative h-6 bg-slate-50 border border-slate-200 rounded-sm overflow-hidden shadow-inner">
+                                                    <div className="absolute inset-0 flex pointer-events-none">
+                                                        {Array.from({ length: 52 }).map((_, i) => (
+                                                            <div key={i} className="flex-1 border-r border-slate-200/30 h-full" />
+                                                        ))}
+                                                    </div>
+                                                    {[-2, -1, 0, 1, 2].map(cycle => {
+                                                        const baseOffset = g.offset + (cycle * calculations.bioCycleW);
+                                                        return calculations.phases.map((p, pIdx) => {
+                                                            const phaseStart = baseOffset + calculations.phases.slice(0, pIdx).reduce((a, b) => a + b.duration, 0);
+                                                            const phaseEnd = phaseStart + p.duration;
+                                                            if (phaseEnd <= 0 || phaseStart >= 52) return null;
+                                                            const left = (phaseStart / 52) * 100;
+                                                            const width = (p.duration / 52) * 100;
+                                                            return <div key={`${cycle}-${p.id}`} className={`absolute h-full ${p.color} border-r border-white/20`} style={{ left: `${left}%`, width: `${width}%` }} />;
+                                                        });
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="absolute top-8 bottom-10 left-24 right-0 pointer-events-none z-20 flex">
+                                        {Array.from({ length: 52 }).map((_, i) => <div key={i} className={`flex-1 border-l h-full ${i % 4 === 0 ? 'border-slate-800/40 w-[1.5px]' : 'border-slate-300/30 w-[1px]'}`} />)}
+                                        <div className="border-r border-slate-800/40 h-full" />
+                                    </div>
+
+                                    <div 
+                                        className="absolute top-0 bottom-10 w-[3px] bg-red-600 z-30 pointer-events-none shadow-[0_0_15px_rgba(220,38,38,0.7)] transition-all duration-75" 
+                                        style={{ left: `calc(96px + ${(currentWeek / 52) * 100}% - ${(currentWeek / 52) * 96}px)` }} 
+                                    />
+
+                                    <div className="flex items-center mt-6">
+                                        <div className="w-24 shrink-0"></div> 
+                                        <div className="flex-1 px-0 relative z-40">
+                                            <input type="range" min="0" max="51" step="1" value={currentWeek} onChange={(e) => setCurrentWeek(parseInt(e.target.value))} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className={`p-6 rounded-xl border-2 transition-all ${calculations.groupStates.some(g => g.phase.id === 'service' || g.isCleaningDZ) ? 'bg-white border-blue-600 shadow-lg scale-[1.02]' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
+                                    <header className="flex justify-between items-start mb-6 border-b pb-3">
+                                        <h4 className="text-[10px] font-bold text-blue-800 uppercase tracking-widest">Deckzentrum</h4>
+                                        <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-1 rounded">{currentConfig.areaService.toLocaleString('de-DE')} m²</span>
+                                    </header>
+                                    <div className="space-y-2 min-h-[100px]">
+                                        {calculations.groupStates.filter(g => g.phase.id === 'service').map(g => (
+                                            <div key={g.groupNum} className="flex items-center justify-between bg-blue-600 text-white p-3 rounded-lg text-xs font-bold uppercase shadow-sm border border-blue-700 animate-in fade-in zoom-in">
+                                                <div className="flex items-center gap-2"><Users size={14}/><span>G {g.groupNum}</span></div>
+                                                <span>{calculations.sowsPerGroup} S.</span>
+                                            </div>
+                                        ))}
+                                        {calculations.groupStates.filter(g => g.isCleaningDZ).map(g => (
+                                            <div key={`RD-DZ-${g.groupNum}`} className="flex items-center justify-between bg-slate-100 text-slate-500 p-2.5 rounded-lg text-[9px] font-black uppercase border border-dashed border-slate-300">
+                                                <div className="flex items-center gap-2"><Droplets size={12}/><span>R&D (ex G {g.groupNum})</span></div>
+                                                <span>Abteil leer</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className={`p-6 rounded-xl border-2 transition-all ${calculations.groupStates.some(g => g.phase.id === 'gestation') ? 'bg-white border-emerald-600 shadow-lg' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
+                                    <header className="flex justify-between items-start mb-6 border-b pb-3">
+                                        <h4 className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest">Wartestall</h4>
+                                        <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded">{currentConfig.areaGestation.toLocaleString('de-DE')} m²</span>
+                                    </header>
+                                    <div className="space-y-2 min-h-[100px]">
+                                        {calculations.groupStates.filter(g => g.phase.id === 'gestation').map(g => (
+                                            <div key={g.groupNum} className="flex items-center justify-between bg-emerald-600 text-white p-3 rounded-lg text-xs font-bold uppercase shadow-sm border border-emerald-700">
+                                                <span>G {g.groupNum}</span>
+                                                <span>{calculations.sowsPerGroup} S.</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className={`p-6 rounded-xl border-2 transition-all ${calculations.groupStates.some(g => g.phase.id === 'farrowing' || g.isCleaningAF) ? 'bg-white border-pink-600 shadow-lg scale-[1.02]' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
+                                    <header className="flex justify-between items-start mb-6 border-b pb-3">
+                                        <h4 className="text-[10px] font-bold text-pink-800 uppercase tracking-widest">Abferkelstall</h4>
+                                        <span className="text-[10px] font-bold bg-pink-50 text-pink-700 px-2 py-1 rounded">{currentConfig.areaFarrowing.toLocaleString('de-DE')} m²</span>
+                                    </header>
+                                    <div className="space-y-2 min-h-[100px]">
+                                        {calculations.groupStates.filter(g => g.phase.id === 'farrowing').map(g => (
+                                            <div key={g.groupNum} className="flex items-center justify-between bg-pink-600 text-white p-3 rounded-lg text-xs font-bold uppercase shadow-sm border border-pink-700 animate-in fade-in zoom-in">
+                                                <span>G {g.groupNum}</span>
+                                                <span>{calculations.sowsPerGroup} S.</span>
+                                            </div>
+                                        ))}
+                                        {calculations.groupStates.filter(g => g.isCleaningAF).map(g => (
+                                            <div key={`RD-AF-${g.groupNum}`} className="flex items-center justify-between bg-slate-100 text-slate-500 p-2.5 rounded-lg text-[9px] font-black uppercase border border-dashed border-slate-300">
+                                                <div className="flex items-center gap-2"><Droplets size={12}/><span>R&D (ex G {g.groupNum})</span></div>
+                                                <span>Abteil leer</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <section className="bg-slate-900 text-slate-300 p-8 rounded-xl border-l-8 border-blue-700 shadow-xl text-[11px] leading-relaxed text-justify">
+                                <p><strong>Bauliche Kapazität:</strong> Der rote Indikator visualisiert die Gleichzeitigkeit der Stallbelegung. Die Bedarfsberechnung in der Sidebar verdeutlicht, dass die Anzahl der Abteile nicht nur durch die Tierpräsenz, sondern maßgeblich durch Serviceperioden (R&D) bestimmt wird. Die Gesamtkapazität je Bereich ergibt sich aus der Anzahl der Abteile multipliziert mit der jeweiligen Gruppengröße.</p>
+                            </section>
+                        </main>
+                    </div>
+
+                    <footer className="max-w-7xl mx-auto mt-12 pt-6 border-t border-slate-300 text-gray-500 text-[10px] font-bold uppercase tracking-[0.2em] flex justify-between items-center">
+                        <p>HAW | Professur für Verfahrenstechnik in der Nutztierhaltung</p>
+                        <p>Prozessmodell: Analyse der Belegungsrhythmik & TierSchNutztV</p>
+                    </footer>
+                </div>
+            );
+        };
+
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>
