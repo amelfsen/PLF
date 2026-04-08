@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Angewandtes Betriebsmanagement | HAW Kiel</title>
+    <!-- Tailwind CSS für modernes, responsives Design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        haw: {
+                            blue: '#00407A', 
+                            light: '#E6F0F9' 
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen p-4 md:p-8">
+
+    <header class="max-w-6xl mx-auto mb-12 flex flex-col md:flex-row items-center md:items-start gap-6 border-b border-slate-200 pb-8 mt-4">
+        <!-- Logo liegt einen Ordner weiter oben im Hauptverzeichnis -->
+        <img src="../HAW_Kiel_Logo_rgb.png" alt="HAW Kiel Logo" class="h-20 md:h-24 object-contain">
+        
+        <div class="text-center md:text-left mt-2 md:mt-0">
+            <!-- Navigation zurück zur Hauptübersicht -->
+            <a href="../" class="inline-flex items-center text-sm text-slate-500 hover:text-haw-blue mb-2 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Zurück zur Modul-Übersicht
+            </a>
+            <h1 class="text-3xl md:text-4xl font-bold text-haw-blue mb-3">Angewandtes Betriebsmanagement</h1>
+            <p class="text-slate-600 text-lg max-w-2xl">
+                Werkzeuge und Analysen für die landwirtschaftliche Betriebsführung.
+            </p>
+        </div>
+    </header>
+
+    <!-- Grid für die Tool-Kacheln -->
+    <main class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <a href="CMS_vs_AMS.html" class="block group bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md hover:border-haw-blue transition-all duration-200">
+            <div class="flex items-center justify-center w-12 h-12 bg-haw-light text-haw-blue rounded-lg mb-4 group-hover:bg-haw-blue group-hover:text-white transition-colors">
+                <!-- SVG Icon (Vergleich / Switch) -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+            </div>
+            <h2 class="text-xl font-semibold text-slate-900 mb-2 group-hover:text-haw-blue transition-colors">Melksysteme: CMS vs. AMS</h2>
+            <p class="text-slate-600 text-sm leading-relaxed">
+                Vergleichstool und Analyse zwischen konventionellen (CMS) und automatischen Melksystemen (AMS).
+            </p>
+        </a>
+
+    </main>
+
+</body>
+</html>
